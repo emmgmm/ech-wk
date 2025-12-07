@@ -1,0 +1,93 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Initialize Go module
+        run: |
+          go mod init ech-workers || true
+          go mod tidy
+
+      - name: Build Go executable
+        run: |
+          $env:GOOS="windows"; $env:GOARCH="amd64"; go build -o ech-workers.exe ech-workers.go
+
+      - name: Test executable
+        run: |
+          .\ech-workers.exe -h
+
+  build-macos:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Initialize Go module
+        run: |
+          go mod init ech-workers || true
+          go mod tidy
+
+      - name: Build Go executable
+        run: |
+          GOOS=darwin GOARCH=${{ matrix.arch }} go build -o ech-workers ech-workers.go
+
+      - name: Test executable
+        run: |
+          ./ech-workers -h
+
+  test-python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile gui.py
+
+      - name: Install dependencies (PyQt5)
+        if: matrix.os != 'ubuntu-latest' || matrix.python-version == '3.9'
+        run: |
+          pip install PyQt5 || echo "PyQt5 installation skipped"
+
